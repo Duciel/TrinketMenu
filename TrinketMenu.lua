@@ -133,11 +133,21 @@ function TrinketMenu.BuildMenu()
 	-- go through bags and gather trinkets into .BaggedTrinkets
 	for i=0,4 do
 		for j=1,GetContainerNumSlots(i) do
-			itemLink = GetContainerItemLink(i,j)
-			
+			-- [OctoWoW] ClassicAPI gives the item ID directly; no link parsing needed
+			if C_Container and C_Container.GetContainerItemID then
+				itemID = C_Container.GetContainerItemID(i,j)
+				itemLink = itemID
+			else
+				itemLink = GetContainerItemLink(i,j)
+			end
+
 			if itemLink then
-				_,_,itemID,itemName = string.find(GetContainerItemLink(i,j) or "","item:(%d+).+%[(.+)%]")
-				_,_,_,_,_,_,_,equipSlot,itemTexture = GetItemInfo(itemID or "")
+				if C_Container and C_Container.GetContainerItemID then
+					itemName,_,_,_,_,_,_,equipSlot,itemTexture = GetItemInfo(itemID)
+				else
+					_,_,itemID,itemName = string.find(itemLink,"item:(%d+).+%[(.+)%]")
+					_,_,_,_,_,_,_,equipSlot,itemTexture = GetItemInfo(itemID or "")
+				end
 				if equipSlot=="INVTYPE_TRINKET" then
 					if not TrinketMenu.BaggedTrinkets[idx] then
 						TrinketMenu.BaggedTrinkets[idx] = {}
@@ -281,6 +291,10 @@ end
 -- returns true if the player is really dead or ghost, not merely FD
 function TrinketMenu.IsPlayerReallyDead()
 	local dead = UnitIsDeadOrGhost("player")
+	-- [OctoWoW] ClassicAPI answers this directly
+	if UnitIsFeignDeath then
+		return dead and not UnitIsFeignDeath("player")
+	end
 	for i=1,24 do
 		if UnitBuff("player",i)=="Interface\\Icons\\Ability_Rogue_FeignDeath" then
 			dead = nil
@@ -290,9 +304,16 @@ function TrinketMenu.IsPlayerReallyDead()
 end
 
 function TrinketMenu.ItemInfo(slot)
-	local link,id,name,equipLoc,texture = GetInventoryItemLink("player",slot)
+	local link,id,name,equipLoc,texture
+	-- [OctoWoW] ClassicAPI gives the item ID directly
+	if GetInventoryItemID then
+		id = GetInventoryItemID("player",slot)
+		link = id
+	else
+		link = GetInventoryItemLink("player",slot)
+		if link then _,_,id = string.find(link,"item:(%d+)") end
+	end
 	if link then
-		local _,_,id = string.find(link,"item:(%d+)")
 		name,_,_,_,_,_,_,equipLoc,texture = GetItemInfo(id)
 	else
 		_,texture = GetInventorySlotInfo("Trinket"..(slot-13).."Slot")
